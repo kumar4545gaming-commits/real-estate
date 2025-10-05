@@ -1,3 +1,13 @@
+:root {
+  --primary-dark: #22204A;
+  --primary-light: #1a1a3a;
+  --accent-light: #e8eaf6;
+  --accent-lighter: #cfd3ff;
+  --text-primary: #22204A;
+  --text-secondary: #666;
+  --whatsapp-green: #25D366;
+}
+
 .App {
   text-align: center;
 }
@@ -14,7 +24,7 @@
 }
 
 .App-header {
-  background-color: #282c34;
+  background-color: var(--primary-dark);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -25,7 +35,32 @@
 }
 
 .App-link {
-  color: #61dafb;
+  color: var(--accent-light);
+}
+
+/* Additional utility classes for consistent styling */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.bg-primary {
+  background-color: var(--primary-dark);
+}
+
+.bg-primary-light {
+  background-color: var(--primary-light);
+}
+
+.text-accent {
+  color: var(--accent-light);
+}
+
+.border-primary {
+  border-color: var(--primary-dark);
 }
 
 @keyframes App-logo-spin {

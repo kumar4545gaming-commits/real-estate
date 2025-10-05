@@ -1,0 +1,33 @@
+mutation CreateUser @auth(level: USER) {
+  user_insert(data: {
+    displayName: "New User",
+    email: "newuser@example.com"
+  })
+}
+
+query ListProperties @auth(level: PUBLIC) {
+  properties {
+    id
+    title
+    address
+    price
+  }
+}
+
+mutation UpdateProperty($id: UUID!) @auth(level: USER) {
+  property_update(
+    key: {id: $id},
+    data: {
+      description: "Updated description"
+    }
+  )
+}
+
+query GetUserProperties @auth(level: USER) {
+  properties(where: {ownerId: {eq_expr: "auth.uid"}}) {
+    id
+    title
+    address
+    price
+  }
+}

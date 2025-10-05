@@ -1,0 +1,86 @@
+mutation SeedDatabase @auth(level: NO_ACCESS) {
+  user_insertMany(data: [
+    {
+      id: "6b469837-d2a6-472d-b4dc-9f80a0001421",
+      createdAt: "2024-04-17T12:00:00Z",
+      displayName: "Bob User",
+      email: "bob@example.com",
+      phoneNumber: "555-123-4567",
+      photoUrl: "https://example.com/bob.jpg",
+      userType: "Agent"
+    },
+    {
+      id: "7c57a948-e3b7-483e-c5ef-0ab1b1112532",
+      createdAt: "2024-04-17T13:00:00Z",
+      displayName: "Alice Agent",
+      email: "alice@example.com",
+      phoneNumber: "555-987-6543",
+      photoUrl: "https://example.com/alice.jpg",
+      userType: "User"
+    }
+  ])
+  property_insertMany(data: [
+    {
+      id: "8d68ba59-f4c8-494f-d6fe-1bc2c2223643",
+      ownerId: "6b469837-d2a6-472d-b4dc-9f80a0001421",
+      address: "123 Main St",
+      amenities: ["pool", "gym"],
+      bathrooms: 2.5,
+      bedrooms: 3,
+      city: "Anytown",
+      createdAt: "2024-04-17T14:00:00Z",
+      description: "A beautiful home in a great location.",
+      latitude: 34.0522,
+      listingStatus: "active",
+      longitude: -118.2437,
+      lotSize: 0.25,
+      price: 500000,
+      propertyType: "house",
+      squareFootage: 2000,
+      state: "CA",
+      title: "Charming Home",
+      yearBuilt: 1990,
+      zipCode: "90210"
+    },
+    {
+      id: "9e79cb6a-05d9-5a50-e70f-2cd3d3334754",
+      ownerId: "7c57a948-e3b7-483e-c5ef-0ab1b1112532",
+      address: "456 Oak Ave",
+      amenities: ["park", "school"],
+      bathrooms: 1.0,
+      bedrooms: 2,
+      city: "Springfield",
+      createdAt: "2024-04-17T15:00:00Z",
+      description: "A cozy apartment near downtown.",
+      latitude: 37.7749,
+      listingStatus: "pending",
+      longitude: -122.4194,
+      lotSize: 0.10,
+      price: 250000,
+      propertyType: "apartment",
+      squareFootage: 1000,
+      state: "IL",
+      title: "Cozy Apartment",
+      yearBuilt: 2005,
+      zipCode: "62704"
+    }
+  ])
+  image_insertMany(data: [
+    {
+      id: "0fa0ab7b-16ea-4b5a-f810-3de4e4445865",
+      propertyId: "8d68ba59-f4c8-494f-d6fe-1bc2c2223643",
+      caption: "Front view of the house",
+      createdAt: "2024-04-17T16:00:00Z",
+      imageUrl: "https://example.com/house1_front.jpg",
+      order: 1
+    },
+    {
+      id: "10b1bc8c-27fb-5c6b-f911-4ef5f5556976",
+      propertyId: "9e79cb6a-05d9-5a50-e70f-2cd3d3334754",
+      caption: "Living room of the apartment",
+      createdAt: "2024-04-17T17:00:00Z",
+      imageUrl: "https://example.com/apt1_living.jpg",
+      order: 1
+    }
+  ])
+}
