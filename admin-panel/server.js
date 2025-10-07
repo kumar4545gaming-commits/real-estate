@@ -30,11 +30,11 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/admin_panel', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+// Connect to MongoDB (optional for now)
+// mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/admin_panel', {
+//   useNewUrlParser: true,
+//   useUnifiedTopology: true,
+// });
 
 // Admin Schema
 const adminSchema = new mongoose.Schema({
@@ -63,7 +63,7 @@ const Admin = mongoose.model('Admin', adminSchema);
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Auth middleware
+// Auth middleware (simplified)
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -74,11 +74,13 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const admin = await Admin.findById(decoded.id).select('-password');
-    if (!admin || !admin.isActive) {
-      return res.status(401).json({ success: false, message: 'Invalid token' });
-    }
-    req.admin = admin;
+    // Simple demo admin
+    req.admin = {
+      _id: 'demo-admin',
+      name: 'Super Admin',
+      email: 'admin@example.com',
+      role: 'super-admin'
+    };
     next();
   } catch (error) {
     return res.status(403).json({ success: false, message: 'Invalid token' });
@@ -87,7 +89,7 @@ const authenticateToken = async (req, res, next) => {
 
 // Routes
 
-// Login
+// Login (simplified without MongoDB)
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -96,32 +98,23 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
 
-    const admin = await Admin.findOne({ email }).select('+password');
-    if (!admin) {
+    // Simple hardcoded admin for demo
+    if (email === 'admin@example.com' && password === 'admin123') {
+      const token = jwt.sign({ id: 'demo-admin' }, JWT_SECRET, { expiresIn: '7d' });
+
+      res.json({
+        success: true,
+        token,
+        admin: {
+          id: 'demo-admin',
+          name: 'Super Admin',
+          email: 'admin@example.com',
+          role: 'super-admin'
+        }
+      });
+    } else {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
-
-    const isMatch = await admin.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    if (!admin.isActive) {
-      return res.status(401).json({ success: false, message: 'Account deactivated' });
-    }
-
-    const token = jwt.sign({ id: admin._id }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.json({
-      success: true,
-      token,
-      admin: {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      }
-    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
   }

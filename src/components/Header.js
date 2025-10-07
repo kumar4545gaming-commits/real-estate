@@ -1,7 +1,11 @@
 import React from 'react';
+// eslint-disable-next-line no-unused-vars
+import { Link, useLocation } from 'react-router-dom';
 import './Header.css';
 
 const Header = ({ onToggleSidebar }) => {
+  const location = useLocation();
+  
   return (
     <header className="bg-[#efe5d1]/90 backdrop-blur border-b border-[#e2d6bd]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -29,24 +33,32 @@ const Header = ({ onToggleSidebar }) => {
           {/* Navigation Menu */}
           <nav className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-8">
-              <a
-                href="#home"
-                className="text-blue-700 border-b-2 border-blue-700 px-3 py-2 rounded-md text-sm font-medium"
+              <Link
+                to="/"
+                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                  location.pathname === '/' 
+                    ? 'text-blue-700 border-b-2 border-blue-700' 
+                    : 'text-gray-800 hover:text-blue-700'
+                }`}
               >
                 Home
-              </a>
+              </Link>
               <a
                 href="#about"
                 className="text-gray-800 hover:text-blue-700 px-3 py-2 rounded-md text-sm font-medium transition"
               >
                 About
               </a>
-              <a
-                href="#properties"
-                className="text-gray-800 hover:text-blue-700 px-3 py-2 rounded-md text-sm font-medium transition"
+              <Link
+                to="/properties"
+                className={`px-3 py-2 rounded-md text-sm font-medium transition ${
+                  location.pathname === '/properties' 
+                    ? 'text-blue-700 border-b-2 border-blue-700' 
+                    : 'text-gray-800 hover:text-blue-700'
+                }`}
               >
                 Properties
-              </a>
+              </Link>
               <a
                 href="#agents"
                 className="text-gray-800 hover:text-blue-700 px-3 py-2 rounded-md text-sm font-medium transition"

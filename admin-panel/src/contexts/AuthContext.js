@@ -1,146 +1,135 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import axios from 'axios';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase';
 
 const AuthContext = createContext();
 
-const authReducer = (state, action) => {
-  switch (action.type) {
-    case 'LOGIN_START':
-      return {
-        ...state,
-        loading: true,
-        error: null
-      };
-    case 'LOGIN_SUCCESS':
-      return {
-        ...state,
-        loading: false,
-        isAuthenticated: true,
-        admin: action.payload,
-        error: null
-      };
-    case 'LOGIN_FAILURE':
-      return {
-        ...state,
-        loading: false,
-        isAuthenticated: false,
-        admin: null,
-        error: action.payload
-      };
-    case 'LOGOUT':
-      return {
-        ...state,
-        isAuthenticated: false,
-        admin: null,
-        error: null
-      };
-    case 'CLEAR_ERROR':
-      return {
-        ...state,
-        error: null
-      };
-    default:
-      return state;
-  }
-};
-
-const initialState = {
-  isAuthenticated: false,
-  admin: null,
-  loading: true,
-  error: null
+export const useAuth = () => {
+  return useContext(AuthContext);
 };
 
 export const AuthProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [adminData, setAdminData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Set up axios defaults
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-  }, []);
-
-  // Check if user is logged in on app start
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await axios.get('/api/auth/me');
-          dispatch({
-            type: 'LOGIN_SUCCESS',
-            payload: response.data.admin
-          });
-        } catch (error) {
-          localStorage.removeItem('token');
-          delete axios.defaults.headers.common['Authorization'];
-          dispatch({ type: 'LOGOUT' });
-        }
-      }
-      dispatch({ type: 'CLEAR_ERROR' });
-    };
-
-    checkAuth();
-  }, []);
-
-  const login = async (email, password) => {
-    dispatch({ type: 'LOGIN_START' });
+  // Sign up function
+  const signup = async (email, password, adminData) => {
     try {
-      const response = await axios.post('/api/auth/login', {
-        email,
-        password
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Create admin document in Firestore
+      await setDoc(doc(db, 'admins', user.uid), {
+        ...adminData,
+        role: 'admin',
+        isActive: true,
+        createdAt: new Date()
       });
-
-      const { token, admin } = response.data;
-      localStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: admin
-      });
-
-      return { success: true };
+      
+      return userCredential;
     } catch (error) {
-      const message = error.response?.data?.message || 'Login failed';
-      dispatch({
-        type: 'LOGIN_FAILURE',
-        payload: message
-      });
-      return { success: false, error: message };
+      setError(error.message);
+      throw error;
     }
   };
 
+  // Sign in function
+  const signin = async (email, password) => {
+    try {
+      setError(null);
+      console.log('Attempting to sign in with:', email);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Sign in successful:', result.user);
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error('Sign in error:', error);
+      setError(error.message);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Sign out function
   const logout = () => {
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-    dispatch({ type: 'LOGOUT' });
+    return signOut(auth);
+  };
+
+  // Check if user is admin
+  const isAdmin = async (user) => {
+    if (!user) return false;
+    
+    try {
+      const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+      return adminDoc.exists() && adminDoc.data().isActive;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  };
+
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // For now, allow any authenticated user to access the dashboard
+        // You can add admin checks later if needed
+        setCurrentUser(user);
+        setAdminData({
+          name: user.displayName || 'Admin User',
+          email: user.email,
+          role: 'admin'
+        });
+      } else {
+        setCurrentUser(null);
+        setAdminData(null);
+      }
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Reset password function
+  const resetPassword = async (email) => {
+    try {
+      setError(null);
+      await sendPasswordResetEmail(auth, email);
+      return { success: true, message: 'Password reset email sent!' };
+    } catch (error) {
+      setError(error.message);
+      return { success: false, error: error.message };
+    }
   };
 
   const clearError = () => {
-    dispatch({ type: 'CLEAR_ERROR' });
+    setError(null);
   };
 
   const value = {
-    ...state,
-    login,
+    currentUser,
+    adminData,
+    signup,
+    signin,
     logout,
-    clearError
+    isAdmin,
+    loading,
+    error,
+    isAuthenticated: !!currentUser,
+    clearError,
+    resetPassword
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

@@ -15,17 +15,30 @@ import { db } from '../firebase';
 export const getProperties = async () => {
   try {
     const propertiesRef = collection(db, 'properties');
-    const q = query(
-      propertiesRef, 
-      where('isActive', '==', true),
-      orderBy('createdAt', 'desc')
-    );
-    const querySnapshot = await getDocs(q);
+    // First try with orderBy, if it fails, get all properties without ordering
+    let q;
+    try {
+      q = query(
+        propertiesRef, 
+        where('isActive', '==', true),
+        orderBy('createdAt', 'desc')
+      );
+    } catch (orderError) {
+      console.log('OrderBy failed, trying without orderBy:', orderError);
+      q = query(
+        propertiesRef, 
+        where('isActive', '==', true)
+      );
+    }
     
-    return querySnapshot.docs.map(doc => ({
+    const querySnapshot = await getDocs(q);
+    const properties = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    console.log('Fetched properties from Firebase:', properties);
+    return properties;
   } catch (error) {
     console.error('Error getting properties:', error);
     return [];
@@ -36,19 +49,34 @@ export const getProperties = async () => {
 export const getFeaturedProperties = async () => {
   try {
     const propertiesRef = collection(db, 'properties');
-    const q = query(
-      propertiesRef, 
-      where('isActive', '==', true),
-      where('isFeatured', '==', true),
-      orderBy('createdAt', 'desc'),
-      limit(6)
-    );
-    const querySnapshot = await getDocs(q);
+    // First try with orderBy, if it fails, get featured properties without ordering
+    let q;
+    try {
+      q = query(
+        propertiesRef, 
+        where('isActive', '==', true),
+        where('isFeatured', '==', true),
+        orderBy('createdAt', 'desc'),
+        limit(6)
+      );
+    } catch (orderError) {
+      console.log('OrderBy failed for featured, trying without orderBy:', orderError);
+      q = query(
+        propertiesRef, 
+        where('isActive', '==', true),
+        where('isFeatured', '==', true),
+        limit(6)
+      );
+    }
     
-    return querySnapshot.docs.map(doc => ({
+    const querySnapshot = await getDocs(q);
+    const properties = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
+    
+    console.log('Fetched featured properties from Firebase:', properties);
+    return properties;
   } catch (error) {
     console.error('Error getting featured properties:', error);
     return [];

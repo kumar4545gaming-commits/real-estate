@@ -1,11 +1,10 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAnalytics } from 'firebase/analytics';
 
-// Your web app's Firebase configuration
+// Your Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCq1LY1j9QEU2dPIaFFzu3zU6VwaZVuraI",
   authDomain: "real-estate-5b606.firebaseapp.com",
@@ -26,3 +25,11 @@ export const storage = getStorage(app);
 export const analytics = getAnalytics(app);
 
 export default app;
+
+
+
+
+
+
+
+

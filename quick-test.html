@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Firestore Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .status { padding: 15px; margin: 10px 0; border-radius: 5px; font-weight: bold; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background-color: #0056b3; }
+        .log { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔥 Quick Firestore Test</h1>
+    <p>This will test if your Firestore database is properly connected.</p>
+    
+    <div id="status" class="status info">Ready to test...</div>
+    
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testWrite()">Test Write</button>
+    <button onclick="clearLog()">Clear</button>
+    
+    <h3>Results:</h3>
+    <div id="log" class="log">Click "Test Connection" to start...</div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCq1LY1j9QEU2dPIaFFzu3zU6VwaZVuraI",
+            authDomain: "real-estate-5b606.firebaseapp.com",
+            projectId: "real-estate-5b606",
+            storageBucket: "real-estate-5b606.firebasestorage.app",
+            messagingSenderId: "87544104037",
+            appId: "1:87544104037:web:89a2c6543c14a8eac0b28c",
+            measurementId: "G-1F48MC8DY1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.testConnection = async function() {
+            const status = document.getElementById('status');
+            const log = document.getElementById('log');
+            
+            try {
+                status.className = 'status info';
+                status.textContent = 'Testing connection...';
+                log.textContent += 'Testing Firestore connection...\n';
+                
+                const propertiesRef = collection(db, 'properties');
+                const snapshot = await getDocs(propertiesRef);
+                
+                status.className = 'status success';
+                status.textContent = '✅ Connected! Found ' + snapshot.size + ' properties';
+                log.textContent += '✅ SUCCESS! Firestore is connected.\n';
+                log.textContent += 'Found ' + snapshot.size + ' properties in database\n';
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Connection failed!';
+                log.textContent += '❌ ERROR: ' + error.message + '\n';
+                log.textContent += 'Error code: ' + error.code + '\n';
+                
+                if (error.code === 'firestore/permission-denied') {
+                    log.textContent += 'SOLUTION: Check Firestore rules in Firebase Console\n';
+                } else if (error.code === 'firestore/unavailable') {
+                    log.textContent += 'SOLUTION: Enable Firestore Database in Firebase Console\n';
+                }
+            }
+        };
+
+        window.testWrite = async function() {
+            const log = document.getElementById('log');
+            
+            try {
+                log.textContent += 'Testing write operation...\n';
+                
+                const testProperty = {
+                    name: 'Test Property ' + new Date().getTime(),
+                    location: 'Test Location',
+                    status: 'Available',
+                    createdAt: serverTimestamp()
+                };
+                
+                const docRef = await addDoc(collection(db, 'properties'), testProperty);
+                log.textContent += '✅ Write successful! Property ID: ' + docRef.id + '\n';
+                
+            } catch (error) {
+                log.textContent += '❌ Write failed: ' + error.message + '\n';
+            }
+        };
+
+        window.clearLog = function() {
+            document.getElementById('log').textContent = 'Log cleared...\n';
+        };
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(testConnection, 1000);
+        });
+    </script>
+</body>
+</html>
+

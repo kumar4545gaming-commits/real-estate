@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firestore Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firestore Connection Test</h1>
+        <p>This page will test your Firestore database connection and help diagnose any issues.</p>
+        
+        <div id="status" class="status info">
+            Ready to test Firestore connection...
+        </div>
+        
+        <div>
+            <button onclick="testConnection()">Test Connection</button>
+            <button onclick="testRead()">Test Read Properties</button>
+            <button onclick="testWrite()">Test Write Property</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <h3>Test Results:</h3>
+        <div id="log" class="log">Click "Test Connection" to start...</div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCq1LY1j9QEU2dPIaFFzu3zU6VwaZVuraI",
+            authDomain: "real-estate-5b606.firebaseapp.com",
+            projectId: "real-estate-5b606",
+            storageBucket: "real-estate-5b606.firebasestorage.app",
+            messagingSenderId: "87544104037",
+            appId: "1:87544104037:web:89a2c6543c14a8eac0b28c",
+            measurementId: "G-1F48MC8DY1"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Global functions for testing
+        window.testConnection = async function() {
+            const status = document.getElementById('status');
+            const log = document.getElementById('log');
+            
+            try {
+                status.className = 'status info';
+                status.textContent = 'Testing Firestore connection...';
+                log.textContent += 'Testing Firestore connection...\n';
+                
+                // Test basic connection
+                const propertiesRef = collection(db, 'properties');
+                const snapshot = await getDocs(propertiesRef);
+                
+                status.className = 'status success';
+                status.textContent = '✅ Firestore connection successful!';
+                log.textContent += '✅ Firestore connection successful!\n';
+                log.textContent += `Found ${snapshot.size} properties in database\n`;
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = '❌ Firestore connection failed!';
+                log.textContent += `❌ Error: ${error.message}\n`;
+                log.textContent += `Error code: ${error.code}\n`;
+                log.textContent += `Full error: ${JSON.stringify(error, null, 2)}\n`;
+            }
+        };
+
+        window.testRead = async function() {
+            const log = document.getElementById('log');
+            
+            try {
+                log.textContent += 'Testing read operation...\n';
+                
+                const propertiesRef = collection(db, 'properties');
+                const snapshot = await getDocs(propertiesRef);
+                
+                log.textContent += `✅ Read successful! Found ${snapshot.size} properties\n`;
+                
+                if (snapshot.size > 0) {
+                    log.textContent += 'Properties:\n';
+                    snapshot.forEach((doc) => {
+                        log.textContent += `- ${doc.id}: ${doc.data().name || 'No name'}\n`;
+                    });
+                } else {
+                    log.textContent += 'No properties found in database\n';
+                }
+                
+            } catch (error) {
+                log.textContent += `❌ Read failed: ${error.message}\n`;
+            }
+        };
+
+        window.testWrite = async function() {
+            const log = document.getElementById('log');
+            
+            try {
+                log.textContent += 'Testing write operation...\n';
+                
+                const testProperty = {
+                    name: 'Test Property',
+                    location: 'Test Location',
+                    landArea: '1 acre',
+                    totalUnits: '100',
+                    towers: '2 towers',
+                    possessionStatus: 'Dec 2025',
+                    unitTypes: ['2 BHK', '3 BHK'],
+                    amenities: ['Swimming Pool', 'Gym'],
+                    developer: 'Test Developer',
+                    status: 'Available',
+                    priceRange: '₹50 Lakhs onwards',
+                    rating: '4.5',
+                    description: 'Test property for connection testing',
+                    isFeatured: false,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                };
+                
+                const docRef = await addDoc(collection(db, 'properties'), testProperty);
+                log.textContent += `✅ Write successful! Property added with ID: ${docRef.id}\n`;
+                
+            } catch (error) {
+                log.textContent += `❌ Write failed: ${error.message}\n`;
+                log.textContent += `Error code: ${error.code}\n`;
+            }
+        };
+
+        window.clearLog = function() {
+            document.getElementById('log').textContent = 'Log cleared...\n';
+        };
+
+        // Auto-test on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testConnection();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
+

@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import PropertyListing from './pages/PropertyListing';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/properties" element={<PropertyListing />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>
