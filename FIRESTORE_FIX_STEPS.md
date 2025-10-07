@@ -153,3 +153,5 @@ You'll know it's working when:
 
 The main issue is that Firestore database is not enabled in your Firebase project. Once you enable it and set up the rules, everything should work perfectly!
 
+
+

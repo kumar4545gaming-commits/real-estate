@@ -149,3 +149,5 @@ You'll know everything is working when:
 
 The admin panel now provides a complete property management system with real-time Firestore integration and seamless navigation between components!
 
+
+

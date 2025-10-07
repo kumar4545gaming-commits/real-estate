@@ -134,3 +134,5 @@ try {
 3. Ensure Firestore rules are properly deployed
 4. Check network connectivity to Firebase
 
+
+

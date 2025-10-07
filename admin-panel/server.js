@@ -188,7 +188,7 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Admin API is running' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`Admin API server running on port ${PORT}`);

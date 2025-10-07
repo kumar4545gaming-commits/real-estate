@@ -70,3 +70,5 @@ window.testAddProperty = testAddProperty;
 
 console.log('Firestore test functions loaded. Use testFirestoreConnection() or testAddProperty() to test.');
 
+
+

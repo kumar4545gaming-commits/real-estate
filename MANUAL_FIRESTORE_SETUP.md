@@ -206,3 +206,5 @@ The most common issue is that Firestore rules are not properly configured or pub
 2. Click "Publish" to deploy the rules
 3. Test the connection with the HTML test file
 
+
+

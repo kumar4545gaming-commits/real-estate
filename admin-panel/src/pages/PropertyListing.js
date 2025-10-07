@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -9,6 +10,11 @@ const PropertyListing = () => {
   const [loading, setLoading] = useState(true);
   const [showPropertyForm, setShowPropertyForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Helper function to get images from property
+  const getPropertyImages = (property) => {
+    return property.images || property.propertyImages || [];
+  };
 
   // Function to load properties (can be called externally)
   const loadProperties = async (isRefresh = false) => {
@@ -33,6 +39,7 @@ const PropertyListing = () => {
 
       setProperties(allProperties);
       console.log('Loaded properties from Firestore:', allProperties.length);
+      console.log('Sample property data:', allProperties[0]); // Debug: show first property data
       setLoading(false);
       setRefreshing(false);
 
@@ -60,8 +67,7 @@ const PropertyListing = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-
-      if (loading) {
+  if (loading) {
         return (
           <div className="min-h-screen bg-gray-50 flex items-center justify-center">
             <div className="bg-white p-8 rounded-lg shadow-lg text-center">
@@ -83,338 +89,25 @@ const PropertyListing = () => {
                   There are currently no properties available. Add new properties through the admin panel.
                 </p>
                 <div className="flex flex-col items-center gap-4">
-                  <div style={{
-                    backgroundColor: showPropertyForm ? 'green' : 'red',
-                    color: 'white',
-                    padding: '10px 20px',
-                    borderRadius: '5px',
-                    fontSize: '16px',
-                    fontWeight: 'bold'
-                  }}>
-                    STATE: {showPropertyForm ? 'FORM OPEN' : 'FORM CLOSED'}
-                  </div>
-                  
-                  {/* Comprehensive Property Form */}
+                  {/* Property Form Modal */}
                   {showPropertyForm && (
-                    <div style={{
-                      backgroundColor: 'white',
-                      padding: '40px',
-                      borderRadius: '15px',
-                      border: '2px solid #e5e7eb',
-                      margin: '20px 0',
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-                      maxWidth: '1000px',
-                      width: '100%'
-                    }}>
-                      <h2 style={{ marginBottom: '10px', color: '#1f2937', fontSize: '28px', fontWeight: 'bold', textAlign: 'center' }}>
-                        Add New Property
-                      </h2>
-                      <p style={{ marginBottom: '30px', color: '#6b7280', textAlign: 'center', fontSize: '16px' }}>
-                        Enter property details below
-                      </p>
-                      
-                      <form style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                        
-                        {/* Basic Section */}
-                        <div style={{ border: '2px solid #e5e7eb', borderRadius: '10px', padding: '25px' }}>
-                          <h3 style={{ marginBottom: '20px', color: '#1f2937', fontSize: '20px', fontWeight: 'bold', borderBottom: '2px solid #e5e7eb', paddingBottom: '10px' }}>
-                            📋 Basic Information
-                          </h3>
-                          
-                          {/* Property Images */}
-                          <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#374151', fontSize: '16px' }}>
-                              Property Images (Multiple Images)
-                            </label>
-                            <div style={{
-                              border: '2px dashed #d1d5db',
-                              borderRadius: '8px',
-                              padding: '20px',
-                              textAlign: 'center',
-                              backgroundColor: '#f9fafb'
-                            }}>
-                              <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                style={{ width: '100%', marginBottom: '10px' }}
-                              />
-                              <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>
-                                Select multiple images for the property
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                            <div>
-                              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
-                                Project Name *
-                              </label>
-                              <input
-                                type="text"
-                                style={{
-                                  width: '100%',
-                                  padding: '12px',
-                                  border: '2px solid #d1d5db',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  outline: 'none'
-                                }}
-                                placeholder="Enter project name"
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
-                                Location *
-                              </label>
-                              <input
-                                type="text"
-                                style={{
-                                  width: '100%',
-                                  padding: '12px',
-                                  border: '2px solid #d1d5db',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  outline: 'none'
-                                }}
-                                placeholder="Enter location"
-                              />
-                            </div>
-                            <div style={{ gridColumn: '1 / -1' }}>
-                              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
-                                Total Land Area *
-                              </label>
-                              <input
-                                type="text"
-                                style={{
-                                  width: '100%',
-                                  padding: '12px',
-                                  border: '2px solid #d1d5db',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  outline: 'none'
-                                }}
-                                placeholder="e.g., 5 acres, 10,000 sq ft"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Dimensions Section */}
-                        <div style={{ border: '2px solid #e5e7eb', borderRadius: '10px', padding: '25px' }}>
-                          <h3 style={{ marginBottom: '20px', color: '#1f2937', fontSize: '20px', fontWeight: 'bold', borderBottom: '2px solid #e5e7eb', paddingBottom: '10px' }}>
-                            📐 Dimensions & Configuration
-                          </h3>
-                          
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
-                            <div>
-                              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
-                                No of Units *
-                              </label>
-                              <input
-                                type="text"
-                                style={{
-                                  width: '100%',
-                                  padding: '12px',
-                                  border: '2px solid #d1d5db',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  outline: 'none'
-                                }}
-                                placeholder="e.g., 500 units"
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
-                                Towers and Blocks *
-                              </label>
-                              <input
-                                type="text"
-                                style={{
-                                  width: '100%',
-                                  padding: '12px',
-                                  border: '2px solid #d1d5db',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  outline: 'none'
-                                }}
-                                placeholder="e.g., 5 towers, 20 floors each"
-                              />
-                            </div>
-                            <div style={{ gridColumn: '1 / -1' }}>
-                              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151' }}>
-                                Possession Time *
-                              </label>
-                              <input
-                                type="text"
-                                style={{
-                                  width: '100%',
-                                  padding: '12px',
-                                  border: '2px solid #d1d5db',
-                                  borderRadius: '8px',
-                                  fontSize: '14px',
-                                  outline: 'none'
-                                }}
-                                placeholder="e.g., Dec 2025"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Unit Variants Configuration */}
-                          <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                              <h4 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#1f2937' }}>
-                                Unit Variants Configuration (Up to 3 variants)
-                              </h4>
-                              <button
-                                type="button"
-                                style={{
-                                  backgroundColor: '#3b82f6',
-                                  color: 'white',
-                                  padding: '8px 16px',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '14px',
-                                  fontWeight: '600'
-                                }}
-                              >
-                                + Add Variant
-                              </button>
-                            </div>
-                            
-                            {/* Variant 1 */}
-                            <div style={{ backgroundColor: '#f9fafb', padding: '20px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #e5e7eb' }}>
-                              <h5 style={{ margin: '0 0 15px 0', fontSize: '16px', fontWeight: 'bold', color: '#1f2937' }}>
-                                Variant 1
-                              </h5>
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
-                                <div>
-                                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#374151', fontSize: '14px' }}>
-                                    Unit Type *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    style={{
-                                      width: '100%',
-                                      padding: '10px',
-                                      border: '1px solid #d1d5db',
-                                      borderRadius: '6px',
-                                      fontSize: '14px',
-                                      outline: 'none'
-                                    }}
-                                    placeholder="e.g., 2 BHK"
-                                  />
-                                </div>
-                                <div>
-                                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#374151', fontSize: '14px' }}>
-                                    Sqft *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    style={{
-                                      width: '100%',
-                                      padding: '10px',
-                                      border: '1px solid #d1d5db',
-                                      borderRadius: '6px',
-                                      fontSize: '14px',
-                                      outline: 'none'
-                                    }}
-                                    placeholder="e.g., 1200 sqft"
-                                  />
-                                </div>
-                                <div>
-                                  <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500', color: '#374151', fontSize: '14px' }}>
-                                    Pricing *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    style={{
-                                      width: '100%',
-                                      padding: '10px',
-                                      border: '1px solid #d1d5db',
-                                      borderRadius: '6px',
-                                      fontSize: '14px',
-                                      outline: 'none'
-                                    }}
-                                    placeholder="e.g., ₹1.5 Cr onwards"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Amenities Section */}
-                        <div style={{ border: '2px solid #e5e7eb', borderRadius: '10px', padding: '25px' }}>
-                          <h3 style={{ marginBottom: '20px', color: '#1f2937', fontSize: '20px', fontWeight: 'bold', borderBottom: '2px solid #e5e7eb', paddingBottom: '10px' }}>
-                            🏠 Amenities
-                          </h3>
-                          
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
-                            {[
-                              'Swimming Pool', 'Gym', 'Parking', 'Security', 'Garden', 'Club House',
-                              'Power Backup', 'Lift', 'Playground', 'Shopping Center', 'School Nearby',
-                              'Hospital Nearby', 'Metro Station', 'Bus Stop', 'Restaurant', 'Tennis Court',
-                              'Basketball Court', 'Jogging Track', 'Children Play Area', 'Party Hall'
-                            ].map((amenity) => (
-                              <label key={amenity} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px', borderRadius: '6px', backgroundColor: '#f9fafb' }}>
-                                <input
-                                  type="checkbox"
-                                  style={{ margin: 0, transform: 'scale(1.2)' }}
-                                />
-                                <span style={{ fontSize: '14px', color: '#374151', fontWeight: '500' }}>{amenity}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {/* Form Actions */}
-                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '30px', paddingTop: '20px', borderTop: '2px solid #e5e7eb' }}>
-                          <button
-                            type="button"
-                            onClick={() => setShowPropertyForm(false)}
-                            style={{
-                              padding: '15px 30px',
-                              border: '2px solid #d1d5db',
-                              borderRadius: '8px',
-                              backgroundColor: 'white',
-                              color: '#374151',
-                              cursor: 'pointer',
-                              fontSize: '16px',
-                              fontWeight: '600',
-                              minWidth: '120px'
-                            }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            style={{
-                              padding: '15px 30px',
-                              border: 'none',
-                              borderRadius: '8px',
-                              backgroundColor: '#3b82f6',
-                              color: 'white',
-                              cursor: 'pointer',
-                              fontSize: '16px',
-                              fontWeight: '600',
-                              minWidth: '120px'
-                            }}
-                          >
-                            Save Property
-                  </button>
-                        </div>
-                      </form>
-                    </div>
+                    <PropertyForm
+                      onClose={() => setShowPropertyForm(false)}
+                      onSuccess={(property) => {
+                        console.log('Property added successfully:', property);
+                        setShowPropertyForm(false);
+                        // Refresh the properties list
+                        loadProperties(true);
+                        // Show success message
+                        setTimeout(() => {
+                          alert(`✅ Property "${property.name}" has been added successfully!\n\nYou can see it in the properties list below.`);
+                        }, 500);
+                      }}
+                    />
                   )}
                   
                   <button 
-                    onClick={() => {
-                      console.log('Add Property button clicked (no properties)');
-                      alert('Button clicked! Opening form...');
-                      setShowPropertyForm(true);
-                    }}
+                    onClick={() => setShowPropertyForm(true)}
                     className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-4 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
                     🏢 Add New Property
@@ -445,6 +138,18 @@ const PropertyListing = () => {
                 {refreshing ? '🔄 Refreshing...' : '🔄 Refresh'}
               </button>
               <button
+                onClick={() => {
+                  console.log('All Properties:', properties);
+                  properties.forEach((prop, index) => {
+                    console.log(`Property ${index}:`, prop);
+                    console.log(`Property ${index} images:`, getPropertyImages(prop));
+                  });
+                }}
+                className="bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-700 transition-colors"
+              >
+                🔍 Debug Data
+              </button>
+              <button
                 onClick={() => setShowPropertyForm(true)}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors"
               >
@@ -466,12 +171,27 @@ const PropertyListing = () => {
                 <div className="flex flex-col lg:flex-row">
                   {/* Left Side - Property Image */}
                   <div className="lg:w-1/2">
+                    {getPropertyImages(property).length > 0 ? (
+                      <div className="relative h-48 lg:h-full">
+                        <img
+                          src={getPropertyImages(property)[0]}
+                          alt={property.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {getPropertyImages(property).length > 1 && (
+                          <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                            +{getPropertyImages(property).length - 1} more
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                     <div className="relative h-48 lg:h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                       <div className="text-white text-center">
                         <div className="text-4xl mb-2">🏢</div>
-                        <div className="text-sm font-medium">Property Image</div>
+                          <div className="text-sm font-medium">No Image</div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Right Side - Property Info & Description */}
@@ -493,14 +213,6 @@ const PropertyListing = () => {
                         <span className="text-sm text-gray-500">Price:</span>
                         <span className="text-sm font-medium text-blue-600">{property.priceRange}</span>
                       </div>
-                    </div>
-
-                    {/* Property Description */}
-                    <div className="mb-4">
-                      <p className="text-sm text-gray-700 leading-relaxed">
-                        Prestige Evergreen is a premium, nature-themed residential township by Prestige Group located on Varthur Road, Whitefield, Bangalore.
-                        Spread across 21 acres, it offers approximately 2,000 Vaastu-compliant 1 to 4 BHK apartments with sizes ranging from 650 to 2,500 sq ft.
-                      </p>
                     </div>
 
                     {/* Read More Button */}
@@ -559,14 +271,42 @@ const PropertyListing = () => {
 
             {/* Modal Content */}
             <div className="p-6">
-              {/* Property Image */}
+              {/* Property Images */}
               <div className="mb-6">
+                {/* Debug info - remove this later */}
+                {console.log('Selected Property Images:', getPropertyImages(selectedProperty))}
+                {console.log('Selected Property Keys:', Object.keys(selectedProperty))}
+                {getPropertyImages(selectedProperty).length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="relative h-64 rounded-lg overflow-hidden">
+                      <img
+                        src={getPropertyImages(selectedProperty)[0]}
+                        alt={selectedProperty.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {getPropertyImages(selectedProperty).length > 1 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {getPropertyImages(selectedProperty).slice(1).map((image, index) => (
+                          <div key={index} className="relative h-24 rounded-lg overflow-hidden">
+                            <img
+                              src={image}
+                              alt={`${selectedProperty.name} ${index + 2}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
                 <div className="relative h-64 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <div className="text-white text-center">
                     <div className="text-6xl mb-4">🏢</div>
-                    <div className="text-lg font-medium">Property Image</div>
+                      <div className="text-lg font-medium">No Images Available</div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Property Details */}
@@ -640,11 +380,6 @@ const PropertyListing = () => {
                 </div>
               </div>
 
-
-
-
-
-
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <button className="flex-1 bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors">
@@ -661,115 +396,10 @@ const PropertyListing = () => {
           </div>
         </div>
       )}
-
-      {/* Simple Property Form Modal */}
-      {showPropertyForm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)',
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '30px',
-            borderRadius: '10px',
-            maxWidth: '800px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflow: 'auto',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
-          }}>
-            <h2 style={{ marginBottom: '20px', color: '#1f2937' }}>Add New Property</h2>
-            <p style={{ marginBottom: '20px', color: '#6b7280' }}>
-              Property form is working! State: {showPropertyForm ? 'true' : 'false'}
-            </p>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Project Name:</label>
-              <input 
-                type="text" 
-                placeholder="Enter project name"
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '5px',
-                  fontSize: '16px'
-                }}
-              />
-            </div>
-            
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Location:</label>
-              <input 
-                type="text" 
-                placeholder="Enter location"
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '5px',
-                  fontSize: '16px'
-                }}
-              />
-            </div>
-            
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button 
-                onClick={() => {
-                  console.log('Closing form');
-                  setShowPropertyForm(false);
-                }}
-                style={{
-                  backgroundColor: '#6b7280',
-                  color: 'white',
-                  padding: '10px 20px',
-                  borderRadius: '5px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '16px'
-                }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => {
-                  console.log('Saving property');
-                  alert('Property saved!');
-                  setShowPropertyForm(false);
-                }}
-                style={{
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  padding: '10px 20px',
-                  borderRadius: '5px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '16px'
-                }}
-              >
-                Save Property
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Floating Add Property Button */}
       <button
-        onClick={() => {
-          console.log('Floating button clicked');
-          alert('Floating button clicked! Opening form...');
-          setShowPropertyForm(true);
-        }}
+        onClick={() => setShowPropertyForm(true)}
         className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-300 hover:scale-110 z-40"
         title="Add New Property"
       >
@@ -799,4 +429,3 @@ const PropertyListing = () => {
 };
 
 export default PropertyListing;
-

@@ -253,3 +253,5 @@ service cloud.firestore {
 
 The admin panel now provides a complete property management system with real-time Firestore integration!
 
+
+

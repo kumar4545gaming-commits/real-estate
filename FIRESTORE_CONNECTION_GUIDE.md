@@ -272,3 +272,5 @@ If you're still having issues:
 3. Ensure Firestore is enabled in Firebase Console
 4. Test with a simple Firestore operation first
 
+
+

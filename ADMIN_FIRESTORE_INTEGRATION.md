@@ -175,3 +175,5 @@ The admin panel now seamlessly integrates with the public Properties component:
 - **Real-time**: Changes appear immediately on both sides
 - **Consistent**: Same data structure across both applications
 
+
+
