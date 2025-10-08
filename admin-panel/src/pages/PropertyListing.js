@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import PropertyForm from '../components/PropertyForm';
 
@@ -10,10 +10,49 @@ const PropertyListing = () => {
   const [loading, setLoading] = useState(true);
   const [showPropertyForm, setShowPropertyForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
+  const [deletingProperty, setDeletingProperty] = useState(null);
 
   // Helper function to get images from property
   const getPropertyImages = (property) => {
     return property.images || property.propertyImages || [];
+  };
+
+  // Function to delete a property
+  const handleDeleteProperty = async (property) => {
+    if (!window.confirm(`Are you sure you want to delete "${property.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setDeletingProperty(property.id);
+      console.log('Deleting property:', property.id);
+      
+      await deleteDoc(doc(db, 'properties', property.id));
+      console.log('Property deleted successfully');
+      
+      // Remove from local state
+      setProperties(prev => prev.filter(p => p.id !== property.id));
+      
+      // Close modal if it was open
+      if (selectedProperty && selectedProperty.id === property.id) {
+        setSelectedProperty(null);
+      }
+      
+      alert(`✅ Property "${property.name}" has been deleted successfully!`);
+      
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      alert(`❌ Failed to delete property: ${error.message}`);
+    } finally {
+      setDeletingProperty(null);
+    }
+  };
+
+  // Function to edit a property
+  const handleEditProperty = (property) => {
+    setEditingProperty(property);
+    setShowPropertyForm(true);
   };
 
   // Function to load properties (can be called externally)
@@ -39,7 +78,11 @@ const PropertyListing = () => {
 
       setProperties(allProperties);
       console.log('Loaded properties from Firestore:', allProperties.length);
-      console.log('Sample property data:', allProperties[0]); // Debug: show first property data
+      if (allProperties.length > 0) {
+        console.log('Sample property data:', allProperties[0]); // Debug: show first property data
+        console.log('Sample property images:', allProperties[0].images); // Debug: show images
+        console.log('All property keys:', Object.keys(allProperties[0])); // Debug: show all keys
+      }
       setLoading(false);
       setRefreshing(false);
 
@@ -92,10 +135,15 @@ const PropertyListing = () => {
                   {/* Property Form Modal */}
                   {showPropertyForm && (
                     <PropertyForm
-                      onClose={() => setShowPropertyForm(false)}
+                      onClose={() => {
+                        setShowPropertyForm(false);
+                        setEditingProperty(null);
+                      }}
+                      editingProperty={editingProperty}
                       onSuccess={(property) => {
                         console.log('Property added successfully:', property);
                         setShowPropertyForm(false);
+                        setEditingProperty(null);
                         // Refresh the properties list
                         loadProperties(true);
                         // Show success message
@@ -215,13 +263,34 @@ const PropertyListing = () => {
                       </div>
                     </div>
 
-                    {/* Read More Button */}
-                    <button
-                      onClick={() => setSelectedProperty(property)}
-                      className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors"
-                    >
-                      Read More
-                    </button>
+                    {/* Action Buttons */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setSelectedProperty(property)}
+                        className="w-full bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors"
+                      >
+                        Read More
+                      </button>
+                      
+                      {/* Admin Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditProperty(property)}
+                          className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transition-colors text-sm"
+                          title="Edit Property"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProperty(property)}
+                          disabled={deletingProperty === property.id}
+                          className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors text-sm disabled:opacity-50"
+                          title="Delete Property"
+                        >
+                          {deletingProperty === property.id ? '🗑️ Deleting...' : '🗑️ Delete'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -276,6 +345,18 @@ const PropertyListing = () => {
                 {/* Debug info - remove this later */}
                 {console.log('Selected Property Images:', getPropertyImages(selectedProperty))}
                 {console.log('Selected Property Keys:', Object.keys(selectedProperty))}
+                {getPropertyImages(selectedProperty).length > 0 && (
+                  <div style={{ padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '5px', marginBottom: '10px' }}>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#1e40af' }}>
+                      🔍 Debug: Found {getPropertyImages(selectedProperty).length} images
+                    </p>
+                    {getPropertyImages(selectedProperty).map((url, index) => (
+                      <p key={index} style={{ margin: '5px 0 0 0', fontSize: '10px', color: '#64748b', wordBreak: 'break-all' }}>
+                        Image {index + 1}: {url}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {getPropertyImages(selectedProperty).length > 0 ? (
                   <div className="space-y-4">
                     <div className="relative h-64 rounded-lg overflow-hidden">
@@ -381,16 +462,42 @@ const PropertyListing = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="flex-1 bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors">
-                  Enquire Now
-                </button>
-                <button className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
-                  WhatsApp
-                </button>
-                <button className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-                  Call Now
-                </button>
+              <div className="space-y-4">
+                {/* Admin Action Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedProperty(null);
+                      handleEditProperty(selectedProperty);
+                    }}
+                    className="flex-1 bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition-colors"
+                  >
+                    ✏️ Edit Property
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedProperty(null);
+                      handleDeleteProperty(selectedProperty);
+                    }}
+                    disabled={deletingProperty === selectedProperty.id}
+                    className="flex-1 bg-red-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+                  >
+                    {deletingProperty === selectedProperty.id ? '🗑️ Deleting...' : '🗑️ Delete Property'}
+                  </button>
+                </div>
+                
+                {/* Customer Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button className="flex-1 bg-orange-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-600 transition-colors">
+                    Enquire Now
+                  </button>
+                  <button className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors">
+                    WhatsApp
+                  </button>
+                  <button className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                    Call Now
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -411,15 +518,21 @@ const PropertyListing = () => {
       {/* Property Form Modal */}
       {showPropertyForm && (
         <PropertyForm
-          onClose={() => setShowPropertyForm(false)}
-          onSuccess={(property) => {
-            console.log('Property added successfully:', property);
+          onClose={() => {
             setShowPropertyForm(false);
+            setEditingProperty(null);
+          }}
+          editingProperty={editingProperty}
+          onSuccess={(property) => {
+            console.log('Property saved successfully:', property);
+            setShowPropertyForm(false);
+            setEditingProperty(null);
             // Refresh the properties list with visual feedback
             loadProperties(true);
             // Show success message
             setTimeout(() => {
-              alert(`✅ Property "${property.name}" has been added successfully!\n\nYou can see it in the properties list below.`);
+              const action = editingProperty ? 'updated' : 'added';
+              alert(`✅ Property "${property.name}" has been ${action} successfully!\n\nYou can see it in the properties list below.`);
             }, 500);
           }}
         />

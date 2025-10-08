@@ -5,7 +5,6 @@ import {
   Home, 
   Building2, 
   Plus, 
-  Settings, 
   LogOut, 
   Menu, 
   X,
@@ -13,7 +12,7 @@ import {
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
-  const { currentUser, adminData, logout } = useAuth();
+  const { adminData, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 
-const PropertyForm = ({ onClose, onSuccess }) => {
+const PropertyForm = ({ onClose, onSuccess, editingProperty }) => {
   const [formData, setFormData] = useState({
     projectName: '',
     location: '',
@@ -21,6 +21,25 @@ const PropertyForm = ({ onClose, onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState('');
+
+  // Populate form when editing a property
+  useEffect(() => {
+    if (editingProperty) {
+      console.log('Populating form for editing:', editingProperty);
+      setFormData({
+        projectName: editingProperty.name || '',
+        location: editingProperty.location || '',
+        totalLandArea: editingProperty.landArea || '',
+        noOfUnits: editingProperty.totalUnits || '',
+        towersAndBlocks: editingProperty.towers || '',
+        possessionTime: editingProperty.possessionStatus || '',
+        unitVariants: editingProperty.unitVariants || [{ variant: '', sqft: '', pricing: '' }],
+        amenities: editingProperty.amenities || [],
+        propertyImages: editingProperty.images || [],
+        imageFiles: [] // Don't populate imageFiles for existing images
+      });
+    }
+  }, [editingProperty]);
 
   // Cleanup object URLs when component unmounts
   useEffect(() => {
@@ -91,7 +110,8 @@ const PropertyForm = ({ onClose, onSuccess }) => {
     }));
   };
 
-  const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
+
+  const compressImageFast = (file, maxWidth = 800, quality = 0.7) => {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -117,23 +137,40 @@ const PropertyForm = ({ onClose, onSuccess }) => {
     });
   };
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
       console.log('Files selected:', files);
+      setUploadStatus('Compressing images...');
       
-      const imageUrls = files.map(file => {
-        console.log('Creating URL for file:', file.name, file.size);
-        return URL.createObjectURL(file);
+      const compressedFiles = [];
+      const imageUrls = [];
+      
+      // Process files in parallel for faster compression
+      const compressionPromises = files.map(async (file, index) => {
+        try {
+          const compressedFile = await compressImageFast(file);
+          compressedFiles.push(compressedFile);
+          imageUrls.push(URL.createObjectURL(compressedFile));
+          console.log(`Compressed ${file.name}: ${file.size} -> ${compressedFile.size} bytes`);
+        } catch (error) {
+          console.error('Compression failed for:', file.name, error);
+          // Fallback to original file
+          compressedFiles.push(file);
+          imageUrls.push(URL.createObjectURL(file));
+        }
       });
+      
+      await Promise.all(compressionPromises);
       
       setFormData(prev => ({
         ...prev,
         propertyImages: [...prev.propertyImages, ...imageUrls],
-        imageFiles: [...prev.imageFiles, ...files]
+        imageFiles: [...prev.imageFiles, ...compressedFiles]
       }));
       
-      console.log('Updated formData with files:', files.length);
+      setUploadStatus('');
+      console.log('Updated formData with compressed files:', compressedFiles.length);
     }
   };
 
@@ -154,44 +191,100 @@ const PropertyForm = ({ onClose, onSuccess }) => {
       return [];
     }
     
-    console.log('Starting upload of', files.length, 'files');
-    setUploadStatus('Uploading images...');
+    console.log('🚀 Starting parallel upload of', files.length, 'files');
+    console.log('📁 Files to upload:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+    setUploadStatus('Uploading images in parallel...');
     setUploadProgress(0);
     
-    const results = [];
-    
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      console.log(`Uploading file ${i + 1}/${files.length}:`, file.name, file.size);
-      
-      try {
-        const fileName = `properties/${Date.now()}_${i}_${file.name || 'image'}`;
-        const storageRef = ref(storage, fileName);
-        
-        setUploadStatus(`Uploading ${i + 1} of ${files.length} images...`);
-        
-        const snapshot = await uploadBytes(storageRef, file);
-        console.log('Upload successful for:', file.name);
-        
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        console.log('Download URL generated:', downloadURL);
-        
-        results.push(downloadURL);
-        
-        // Update progress
-        const progress = ((i + 1) / files.length) * 100;
-        setUploadProgress(progress);
-        setUploadStatus(`Uploaded ${i + 1} of ${files.length} images`);
-        
-      } catch (error) {
-        console.error('Error uploading image:', file.name, error);
-        setUploadStatus(`Failed to upload image ${i + 1}: ${error.message}`);
-        // Continue with other images
-      }
+    // Check Firebase Storage connection first
+    try {
+      console.log('🔍 Testing Firebase Storage connection...');
+      console.log('Storage instance:', storage);
+      console.log('Storage app:', storage.app);
+    } catch (error) {
+      console.error('❌ Firebase Storage connection error:', error);
+      setUploadStatus('Firebase Storage connection failed');
+      return [];
     }
     
-    console.log('Upload completed. Results:', results);
-    return results;
+    // Upload all files in parallel for maximum speed
+    const uploadPromises = files.map(async (file, index) => {
+      try {
+        const fileName = `properties/${Date.now()}_${index}_${file.name || 'image'}`;
+        console.log(`📤 Creating storage reference for: ${fileName}`);
+        const storageRef = ref(storage, fileName);
+        
+        console.log(`🚀 Starting upload ${index + 1}/${files.length}:`, {
+          fileName: file.name,
+          size: file.size,
+          type: file.type,
+          storagePath: fileName
+        });
+        
+        // Add timeout to prevent hanging
+        const uploadPromise = uploadBytes(storageRef, file);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Upload timeout after 30 seconds')), 30000)
+        );
+        
+        console.log(`⏳ Uploading file ${index + 1}...`);
+        const snapshot = await Promise.race([uploadPromise, timeoutPromise]);
+        console.log(`📸 Upload snapshot received:`, snapshot);
+        
+        console.log(`🔗 Getting download URL for file ${index + 1}...`);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        console.log(`✅ Upload completed ${index + 1}/${files.length}:`, file.name);
+        console.log(`   📍 Storage path: ${fileName}`);
+        console.log(`   🔗 Download URL: ${downloadURL}`);
+        
+        // Update progress
+        const progress = ((index + 1) / files.length) * 100;
+        setUploadProgress(progress);
+        setUploadStatus(`Uploaded ${index + 1} of ${files.length} images`);
+        
+        return downloadURL;
+      } catch (error) {
+        console.error(`❌ Error uploading image ${index + 1}:`, {
+          fileName: file.name,
+          error: error.message,
+          code: error.code,
+          stack: error.stack
+        });
+        setUploadStatus(`Failed to upload image ${index + 1}: ${error.message}`);
+        return null; // Return null for failed uploads
+      }
+    });
+    
+    // Wait for all uploads to complete
+    console.log('⏳ Waiting for all uploads to complete...');
+    const results = await Promise.all(uploadPromises);
+    
+    // Filter out failed uploads
+    const successfulUploads = results.filter(url => url !== null && url.trim() !== '');
+    
+    console.log('📊 Upload results summary:');
+    console.log('   Total files:', files.length);
+    console.log('   Successful uploads:', successfulUploads.length);
+    console.log('   Failed uploads:', files.length - successfulUploads.length);
+    console.log('   Results array:', results);
+    console.log('   Successful URLs:', successfulUploads);
+    
+    if (successfulUploads.length === 0) {
+      console.error('❌ No images were successfully uploaded!');
+      console.error('   This could be due to:');
+      console.error('   1. Firebase Storage rules blocking uploads');
+      console.error('   2. Network connectivity issues');
+      console.error('   3. File size or format issues');
+      console.error('   4. Firebase Storage quota exceeded');
+    } else {
+      console.log('✅ Upload summary:');
+      successfulUploads.forEach((url, index) => {
+        console.log(`   Image ${index + 1}: ${url}`);
+      });
+    }
+    
+    return successfulUploads;
   };
 
   const validateForm = () => {
@@ -233,9 +326,18 @@ const PropertyForm = ({ onClose, onSuccess }) => {
       let imageUrls = [];
       if (formData.imageFiles.length > 0) {
         console.log('Starting image upload process...');
+        console.log('Files to upload:', formData.imageFiles.length);
         imageUrls = await uploadImagesToStorage(formData.imageFiles);
         console.log('Images uploaded successfully:', imageUrls);
         console.log('Number of uploaded images:', imageUrls.length);
+        
+        // Validate that we have actual URLs
+        if (imageUrls.length === 0) {
+          console.warn('⚠️ No images were successfully uploaded!');
+          alert('Warning: No images were successfully uploaded. The property will be saved without images.');
+        } else {
+          console.log('✅ Successfully uploaded images:', imageUrls);
+        }
       } else {
         console.log('No images to upload');
       }
@@ -243,6 +345,23 @@ const PropertyForm = ({ onClose, onSuccess }) => {
       setUploadStatus('Saving property details...');
       setUploadProgress(100);
 
+      // Combine existing images with newly uploaded images
+      const existingImages = editingProperty ? (editingProperty.images || []) : [];
+      const newImages = Array.isArray(imageUrls) ? imageUrls.filter(url => url && url.trim() !== '') : [];
+      const allImages = [...existingImages, ...newImages];
+      
+      console.log('Existing images:', existingImages);
+      console.log('New images:', newImages);
+      console.log('Combined images:', allImages);
+      console.log('Total images count:', allImages.length);
+      
+      // Ensure we have a valid images array
+      if (allImages.length === 0) {
+        console.log('No images to save - using empty array');
+      } else {
+        console.log('✅ Final images array to save:', allImages);
+      }
+      
       const propertyData = {
         name: formData.projectName,
         location: formData.location,
@@ -253,7 +372,7 @@ const PropertyForm = ({ onClose, onSuccess }) => {
         unitTypes: formData.unitVariants.map(v => v.variant),
         unitVariants: formData.unitVariants,
         amenities: formData.amenities,
-        images: imageUrls, // Store Firebase Storage URLs
+        images: allImages, // Combine existing and new images
         developer: 'Your Developer Name',
         status: 'Available',
         priceRange: formData.unitVariants.length > 0 
@@ -262,17 +381,80 @@ const PropertyForm = ({ onClose, onSuccess }) => {
         rating: '4.5',
         description: `Modern residential project in ${formData.location} with ${formData.noOfUnits} units across ${formData.towersAndBlocks}.`,
         isFeatured: false,
-        createdAt: serverTimestamp(),
+        ...(editingProperty ? {} : { createdAt: serverTimestamp() }), // Only add createdAt for new properties
         updatedAt: serverTimestamp()
       };
+      
+      // Validate the images field before saving
+      if (!Array.isArray(propertyData.images)) {
+        console.error('❌ Images field is not an array!', propertyData.images);
+        propertyData.images = [];
+      }
+      
+      console.log('📋 Final property data to save:');
+      console.log('- Images field type:', typeof propertyData.images);
+      console.log('- Images field value:', propertyData.images);
+      console.log('- Images array length:', propertyData.images.length);
+      
+      console.log('Complete property data before saving:', propertyData);
+      console.log('Images field in property data:', propertyData.images);
 
-      // Save to Firestore
-      console.log('Saving property data to Firestore:', propertyData); // Debug: show what's being saved
-      const docRef = await addDoc(collection(db, 'properties'), propertyData);
-      console.log('Property saved to Firestore with ID:', docRef.id);
+      // Save to Firestore (create or update)
+      console.log('Saving property data to Firestore:', propertyData);
+      console.log('Images field being saved:', propertyData.images);
+      console.log('Images field type:', typeof propertyData.images);
+      console.log('Images field length:', propertyData.images.length);
+      
+      let docRef;
+      if (editingProperty) {
+        // Update existing property
+        console.log('Updating existing property with ID:', editingProperty.id);
+        docRef = doc(db, 'properties', editingProperty.id);
+        await updateDoc(docRef, propertyData);
+        console.log('Property updated successfully');
+      } else {
+        // Create new property
+        console.log('Creating new property');
+        docRef = await addDoc(collection(db, 'properties'), propertyData);
+        console.log('Property created with ID:', docRef.id);
+      }
+      
+      // Verify the saved data by reading it back from Firestore
+      try {
+        const savedDoc = await getDoc(doc(db, 'properties', docRef.id));
+        if (savedDoc.exists()) {
+          const savedData = savedDoc.data();
+          console.log('🔍 Verifying saved data from Firestore...');
+          console.log('- Document ID:', docRef.id);
+          console.log('- Has images field:', 'images' in savedData);
+          console.log('- Images field value:', savedData.images);
+          console.log('- Images array length in Firestore:', savedData.images ? savedData.images.length : 'undefined');
+          console.log('- Images array type in Firestore:', typeof savedData.images);
+          
+          if (savedData.images && Array.isArray(savedData.images) && savedData.images.length > 0) {
+            console.log('✅ SUCCESS: Images successfully saved to Firestore!');
+            savedData.images.forEach((url, index) => {
+              console.log(`   Image ${index + 1}: ${url}`);
+            });
+          } else if (savedData.images && Array.isArray(savedData.images) && savedData.images.length === 0) {
+            console.log('⚠️ WARNING: Images field exists but is empty array');
+          } else {
+            console.error('❌ ERROR: Images field missing or invalid in saved data!');
+            console.error('   Expected: Array with image URLs');
+            console.error('   Actual:', savedData.images);
+          }
+        } else {
+          console.error('❌ Document not found after saving!');
+        }
+      } catch (error) {
+        console.error('❌ Error verifying saved data:', error);
+      }
       
       // Call success callback with the saved data including the Firestore ID
-      const savedProperty = { id: docRef.id, ...propertyData };
+      const propertyId = editingProperty ? editingProperty.id : docRef.id;
+      const savedProperty = { id: propertyId, ...propertyData };
+      console.log('Success callback data:', savedProperty);
+      console.log('Success callback images:', savedProperty.images);
       onSuccess && onSuccess(savedProperty);
       onClose && onClose();
       
@@ -349,7 +531,7 @@ const PropertyForm = ({ onClose, onSuccess }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
-                Add New Property
+                {editingProperty ? 'Edit Property' : 'Add New Property'}
               </h2>
               <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>
                 Enter property details below
@@ -403,7 +585,7 @@ const PropertyForm = ({ onClose, onSuccess }) => {
                   Select multiple images for the property (JPG, PNG, GIF)
                 </p>
                 <p style={{ color: '#10b981', fontSize: '12px', margin: '5px 0 0 0', fontWeight: '500' }}>
-                  ⚡ Images are automatically compressed for faster upload
+                  ⚡ Images are compressed and uploaded in parallel for maximum speed
                 </p>
                 <button
                   type="button"
@@ -438,6 +620,267 @@ const PropertyForm = ({ onClose, onSuccess }) => {
                   }}
                 >
                   🧪 Test Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    console.log('Testing Firestore connection with images...');
+                    try {
+                      const testData = {
+                        name: 'Test Property with Images',
+                        location: 'Test Location',
+                        images: [
+                          'https://example.com/test1.jpg',
+                          'https://example.com/test2.jpg'
+                        ],
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                      };
+                      
+                      console.log('Saving test data:', testData);
+                      const docRef = await addDoc(collection(db, 'properties'), testData);
+                      console.log('Test property saved with ID:', docRef.id);
+                      
+                      // Verify it was saved
+                      const savedDoc = await getDoc(doc(db, 'properties', docRef.id));
+                      if (savedDoc.exists()) {
+                        const savedData = savedDoc.data();
+                        console.log('Test data verified:', savedData);
+                        console.log('Test images array:', savedData.images);
+                        console.log('Test images length:', savedData.images ? savedData.images.length : 'undefined');
+                        
+                        if (savedData.images && savedData.images.length > 0) {
+                          alert('✅ Firestore test successful! Images array saved correctly. Check console for details.');
+                        } else {
+                          alert('❌ Firestore test failed! Images array not found. Check console for details.');
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Firestore test failed:', error);
+                      alert('Firestore test failed: ' + error.message);
+                    }
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    marginLeft: '10px',
+                    padding: '8px 16px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  🗄️ Test Firestore
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    console.log('Checking existing Firestore data...');
+                    try {
+                      const propertiesRef = collection(db, 'properties');
+                      const snapshot = await getDocs(propertiesRef);
+                      
+                      console.log('Total documents in Firestore:', snapshot.size);
+                      
+                      snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        console.log(`Document ${doc.id}:`, data);
+                        console.log(`Images in ${doc.id}:`, data.images);
+                        console.log(`Images type:`, typeof data.images);
+                        console.log(`Images length:`, data.images ? data.images.length : 'undefined');
+                        console.log('---');
+                      });
+                      
+                      alert(`Found ${snapshot.size} properties in Firestore. Check console for details.`);
+                    } catch (error) {
+                      console.error('Error checking Firestore data:', error);
+                      alert('Error checking Firestore data: ' + error.message);
+                    }
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    marginLeft: '10px',
+                    padding: '8px 16px',
+                    backgroundColor: '#8b5cf6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  📊 Check Firestore
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    console.log('Testing direct save with hardcoded images...');
+                    try {
+                      const testProperty = {
+                        name: 'Direct Test Property',
+                        location: 'Test Location',
+                        images: ['https://example.com/test1.jpg', 'https://example.com/test2.jpg'],
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp()
+                      };
+                      
+                      console.log('Saving test property:', testProperty);
+                      const docRef = await addDoc(collection(db, 'properties'), testProperty);
+                      console.log('Test property saved with ID:', docRef.id);
+                      
+                      // Immediately verify
+                      const savedDoc = await getDoc(doc(db, 'properties', docRef.id));
+                      if (savedDoc.exists()) {
+                        const savedData = savedDoc.data();
+                        console.log('Verified saved data:', savedData);
+                        console.log('Images field exists:', 'images' in savedData);
+                        console.log('Images field value:', savedData.images);
+                        
+                        if (savedData.images) {
+                          alert('✅ Images field successfully saved to Firestore! Check Firebase console.');
+                        } else {
+                          alert('❌ Images field not found in saved data!');
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Direct test failed:', error);
+                      alert('Direct test failed: ' + error.message);
+                    }
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    marginLeft: '10px',
+                    padding: '8px 16px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  🔥 Direct Test
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    console.log('Testing complete image upload flow...');
+                    try {
+                      // Create a simple test image
+                      const canvas = document.createElement('canvas');
+                      canvas.width = 200;
+                      canvas.height = 200;
+                      const ctx = canvas.getContext('2d');
+                      
+                      // Draw a simple test image
+                      ctx.fillStyle = '#4f46e5';
+                      ctx.fillRect(0, 0, 200, 200);
+                      ctx.fillStyle = '#ffffff';
+                      ctx.font = '24px Arial';
+                      ctx.textAlign = 'center';
+                      ctx.fillText('TEST IMAGE', 100, 100);
+                      ctx.fillText('UPLOAD', 100, 130);
+                      
+                      // Convert to blob
+                      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                      console.log('Created test image blob:', blob.size, 'bytes');
+                      
+                      // Test the upload process
+                      const testFiles = [blob];
+                      const uploadedUrls = await uploadImagesToStorage(testFiles);
+                      
+                      if (uploadedUrls.length > 0) {
+                        console.log('✅ Test upload successful!');
+                        console.log('Uploaded URLs:', uploadedUrls);
+                        
+                        // Save to Firestore
+                        const testProperty = {
+                          name: 'Complete Test Property',
+                          location: 'Test Location',
+                          images: uploadedUrls,
+                          createdAt: serverTimestamp(),
+                          updatedAt: serverTimestamp()
+                        };
+                        
+                        const docRef = await addDoc(collection(db, 'properties'), testProperty);
+                        console.log('Test property saved with ID:', docRef.id);
+                        
+                        // Verify
+                        const savedDoc = await getDoc(doc(db, 'properties', docRef.id));
+                        if (savedDoc.exists()) {
+                          const savedData = savedDoc.data();
+                          if (savedData.images && savedData.images.length > 0) {
+                            alert('✅ Complete test successful! Images uploaded and saved to Firestore.');
+                          } else {
+                            alert('❌ Complete test failed! Images not saved to Firestore.');
+                          }
+                        }
+                      } else {
+                        console.error('❌ Test upload failed!');
+                        alert('❌ Test upload failed! Check console for details.');
+                      }
+                    } catch (error) {
+                      console.error('Complete test failed:', error);
+                      alert('Complete test failed: ' + error.message);
+                    }
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    marginLeft: '10px',
+                    padding: '8px 16px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  🧪 Complete Test
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    console.log('🔍 Testing Firebase Storage connection...');
+                    try {
+                      // Test Firebase Storage connection
+                      console.log('Storage instance:', storage);
+                      console.log('Storage app:', storage.app);
+                      console.log('Storage bucket:', storage.app.options.storageBucket);
+                      
+                      // Try to create a simple test file
+                      const testData = new Blob(['test'], { type: 'text/plain' });
+                      const testRef = ref(storage, 'test-connection.txt');
+                      
+                      console.log('📤 Attempting to upload test file...');
+                      const snapshot = await uploadBytes(testRef, testData);
+                      console.log('✅ Test upload successful:', snapshot);
+                      
+                      const downloadURL = await getDownloadURL(snapshot.ref);
+                      console.log('🔗 Test download URL:', downloadURL);
+                      
+                      alert('✅ Firebase Storage connection successful!\n\nTest file uploaded and can be accessed.');
+                      
+                    } catch (error) {
+                      console.error('❌ Firebase Storage connection test failed:', error);
+                      alert('❌ Firebase Storage connection failed!\n\nError: ' + error.message + '\n\nCheck console for details.');
+                    }
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    marginLeft: '10px',
+                    padding: '8px 16px',
+                    backgroundColor: '#8b5cf6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  🔗 Test Storage
                 </button>
               </div>
               
@@ -805,7 +1248,7 @@ const PropertyForm = ({ onClose, onSuccess }) => {
                 ></div>
               </div>
               <p style={{ margin: '5px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                {formData.imageFiles.length > 0 ? `Uploading ${formData.imageFiles.length} images...` : 'Saving property details...'}
+                {formData.imageFiles.length > 0 ? `Uploading ${formData.imageFiles.length} images in parallel...` : 'Saving property details...'}
               </p>
             </div>
           )}
@@ -840,13 +1283,13 @@ const PropertyForm = ({ onClose, onSuccess }) => {
                 fontSize: '14px'
               }}
             >
-              {isSubmitting ? 'Saving...' : 'Save Property'}
+              {isSubmitting ? 'Saving...' : (editingProperty ? 'Update Property' : 'Save Property')}
             </button>
             {!isSubmitting && formData.imageFiles.length > 0 && (
               <button
                 type="button"
                 onClick={async () => {
-                  if (window.confirm('Save property without images? This will skip the image upload process.')) {
+                  if (window.confirm('Save property without images? This will skip the image upload process and save immediately.')) {
                     // Save without images
                     const propertyData = {
                       name: formData.projectName,

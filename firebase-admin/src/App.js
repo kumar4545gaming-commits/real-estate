@@ -21,13 +21,13 @@ function App() {
             <Routes>
               <Route path="/setup" element={<Setup />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
               <Route
                 path="/*"
                 element={
                   <ProtectedRoute>
                     <Layout>
                       <Routes>
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/properties" element={<Properties />} />
                         <Route path="/properties/new" element={<PropertyForm />} />

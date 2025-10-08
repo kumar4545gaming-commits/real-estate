@@ -17,3 +17,4 @@ echo "Firestore rules deployed successfully!"
 
 
 
+
